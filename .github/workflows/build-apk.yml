@@ -1,0 +1,58 @@
+
+name: Build MBoard Keyboard APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "*.zip"
+      - ".github/workflows/build-apk.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Extract Android project
+        shell: bash
+        run: |
+          mkdir -p extracted
+          unzip -q MBoard-Keyboard-Android-Project.zip -d extracted
+
+          GRADLEW=$(find extracted -type f -name gradlew | head -n 1)
+
+          if [ -z "$GRADLEW" ]; then
+            echo "ERROR: Gradle wrapper not found in ZIP."
+            echo "The Android project needs Gradle build setup."
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$(dirname "$GRADLEW")" >> "$GITHUB_ENV"
+          chmod +x "$GRADLEW"
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug
+        working-directory: ${{ env.PROJECT_DIR }}
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MBoard-Keyboard-APK
+          path: "**/build/outputs/apk/debug/*.apk"
+          if-no-files-found: error
+          retention-days: 7
