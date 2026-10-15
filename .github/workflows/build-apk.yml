@@ -25,12 +25,35 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Locate Android SDK
+        shell: bash
+        run: |
+          if [ -z "$ANDROID_HOME" ]; then
+            echo "ANDROID_HOME is not set"
+            exit 1
+          fi
+
+          echo "Android SDK: $ANDROID_HOME"
+          ls "$ANDROID_HOME"
 
       - name: Install Android SDK packages
+        shell: bash
         run: |
-          sdkmanager --install \
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+
+          if [ ! -f "$SDKMANAGER" ]; then
+            SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" \
+              -type f -name sdkmanager 2>/dev/null | head -n 1)
+          fi
+
+          if [ -z "$SDKMANAGER" ] || [ ! -f "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager not found in Android SDK."
+            exit 1
+          fi
+
+          yes | "$SDKMANAGER" --licenses || true
+
+          "$SDKMANAGER" --install \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
@@ -48,39 +71,29 @@ jobs:
             chmod +x "$GRADLEW"
             echo "USE_WRAPPER=true" >> "$GITHUB_ENV"
           else
-            GRADLE_FILE=$(find extracted -type f \
-              \( -name build.gradle -o -name build.gradle.kts \) \
-              ! -path '*/buildSrc/*' | head -n 1)
+            SETTINGS=$(find extracted -type f \
+              \( -name settings.gradle -o -name settings.gradle.kts \) \
+              | head -n 1)
 
-            if [ -z "$GRADLE_FILE" ]; then
-              echo "ERROR: No Gradle build file found in ZIP."
+            if [ -z "$SETTINGS" ]; then
+              echo "ERROR: Gradle settings file not found."
               exit 1
             fi
 
-            PROJECT_DIR="$(dirname "$GRADLE_FILE")"
-
-            while [ "$PROJECT_DIR" != "extracted" ] && \
-              [ ! -f "$PROJECT_DIR/settings.gradle" ] && \
-              [ ! -f "$PROJECT_DIR/settings.gradle.kts" ]; do
-              PARENT="$(dirname "$PROJECT_DIR")"
-              if [ "$PARENT" = "." ] || [ "$PARENT" = "$PROJECT_DIR" ]; then
-                break
-              fi
-              PROJECT_DIR="$PARENT"
-            done
-
+            PROJECT_DIR="$(dirname "$SETTINGS")"
             echo "USE_WRAPPER=false" >> "$GITHUB_ENV"
           fi
 
           echo "PROJECT_DIR=$GITHUB_WORKSPACE/$PROJECT_DIR" \
             >> "$GITHUB_ENV"
+
           echo "Project directory: $PROJECT_DIR"
 
       - name: Set up Gradle
         if: env.USE_WRAPPER == 'false'
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.10.2"
 
       - name: Build debug APK
         shell: bash
