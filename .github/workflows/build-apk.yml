@@ -138,20 +138,15 @@ jobs:
         run: |
           FILE="gradle.properties"
           touch "$FILE"
-
-          # Replace these settings if they already exist, avoiding duplicate keys.
           sed -i '/^[[:space:]]*org\.gradle\.jvmargs[[:space:]]*=/d' "$FILE"
           sed -i '/^[[:space:]]*kotlin\.daemon\.jvmargs[[:space:]]*=/d' "$FILE"
           sed -i '/^[[:space:]]*org\.gradle\.workers\.max[[:space:]]*=/d' "$FILE"
           sed -i '/^[[:space:]]*org\.gradle\.parallel[[:space:]]*=/d' "$FILE"
-
-          cat >> "$FILE" <<'PROPERTIES'
-org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8
-kotlin.daemon.jvmargs=-Xmx1g
-org.gradle.workers.max=2
-org.gradle.parallel=false
-PROPERTIES
-
+          printf '%s\n' \
+            'org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8' \
+            'kotlin.daemon.jvmargs=-Xmx1g' \
+            'org.gradle.workers.max=2' \
+            'org.gradle.parallel=false' >> "$FILE"
           echo "Gradle memory settings applied:"
           tail -n 4 "$FILE"
 
